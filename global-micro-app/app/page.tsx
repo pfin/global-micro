@@ -7,6 +7,8 @@ import YieldCurveChart from '@/components/YieldCurveChart';
 import InterpolationControl from '@/components/InterpolationControl';
 import SwapInput from '@/components/SwapInput';
 import RiskDisplay from '@/components/RiskDisplay';
+import DailyForwardChart from '@/components/DailyForwardChart';
+import DateRangeInput from '@/components/DateRangeInput';
 import { YieldCurveBuilder, InterpolationType, SwapDetails, RiskMetrics } from '@/lib/quantlib-curve';
 
 interface Curve {
@@ -36,8 +38,13 @@ export default function Home() {
   const [showRiskMetrics, setShowRiskMetrics] = useState(false);
   const [showDV01, setShowDV01] = useState(false);
   const [showForwardRates, setShowForwardRates] = useState(false);
+  const [showDailyForwards, setShowDailyForwards] = useState(false);
   const [swapRisk, setSwapRisk] = useState<RiskMetrics | null>(null);
   const [curveWithRisk, setCurveWithRisk] = useState<any[]>([]);
+  const [dateRange, setDateRange] = useState({
+    start: new Date(),
+    end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+  });
 
   // Fetch available curves
   useEffect(() => {
@@ -135,6 +142,16 @@ export default function Home() {
               Yield Curve Visualization
             </h1>
             <div className="flex space-x-2">
+              <button
+                onClick={() => setShowDailyForwards(!showDailyForwards)}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  showDailyForwards
+                    ? 'bg-red-600 text-white hover:bg-red-700'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                }`}
+              >
+                {showDailyForwards ? 'Hide Daily Forwards' : 'Show Daily Forwards'}
+              </button>
               <button
                 onClick={() => setShowRiskMetrics(!showRiskMetrics)}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
@@ -240,6 +257,14 @@ export default function Home() {
                     </div>
                   </div>
                 )}
+                
+                {showDailyForwards && (
+                  <DateRangeInput
+                    startDate={dateRange.start}
+                    endDate={dateRange.end}
+                    onDateRangeChange={(start, end) => setDateRange({ start, end })}
+                  />
+                )}
               </div>
             </div>
 
@@ -255,6 +280,21 @@ export default function Home() {
                 showForwardCurve={showForwardRates}
               />
             </div>
+
+            {/* Daily Forward Rates Chart */}
+            {showDailyForwards && (
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                  Daily Forward Rate Analysis
+                </h2>
+                <DailyForwardChart
+                  marketData={marketData}
+                  interpolationType={interpolationType}
+                  startDate={dateRange.start}
+                  endDate={dateRange.end}
+                />
+              </div>
+            )}
 
             {/* Risk Analysis Section */}
             {showRiskMetrics && (

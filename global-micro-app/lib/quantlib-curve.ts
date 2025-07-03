@@ -159,6 +159,33 @@ export class YieldCurveBuilder {
       return { ...point, forwardRate };
     });
   }
+
+  // Calculate daily overnight forward rates
+  calculateDailyForwardRates(startDate: Date, endDate: Date): Array<{date: Date, forwardRate: number}> {
+    const dailyRates: Array<{date: Date, forwardRate: number}> = [];
+    const msPerDay = 24 * 60 * 60 * 1000;
+    
+    for (let date = new Date(startDate); date <= endDate; date = new Date(date.getTime() + msPerDay)) {
+      const days = Math.floor((date.getTime() - startDate.getTime()) / msPerDay);
+      
+      // Calculate overnight forward rate (1-day forward starting at date)
+      const t1 = days / 365.0;
+      const t2 = (days + 1) / 365.0;
+      
+      const r1 = this.getRate(days) / 100.0;
+      const r2 = this.getRate(days + 1) / 100.0;
+      
+      // Overnight forward rate
+      const forwardRate = ((r2 * t2 - r1 * t1) / (t2 - t1)) * 100.0;
+      
+      dailyRates.push({
+        date: new Date(date),
+        forwardRate
+      });
+    }
+    
+    return dailyRates;
+  }
   
   // Price a swap and calculate risk
   priceSwap(swap: SwapDetails): RiskMetrics {
