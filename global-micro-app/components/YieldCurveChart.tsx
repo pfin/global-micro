@@ -30,19 +30,50 @@ interface YieldCurveChartProps {
     days: number;
   }[];
   title?: string;
+  interpolationType?: 'smooth' | 'step' | 'hybrid';
+  showForwardCurve?: boolean;
 }
 
-export default function YieldCurveChart({ data, title = 'Yield Curve' }: YieldCurveChartProps) {
+export default function YieldCurveChart({ 
+  data, 
+  title = 'Yield Curve', 
+  interpolationType = 'smooth',
+  showForwardCurve = false 
+}: YieldCurveChartProps) {
+  // Create more granular data points for smoother curves
+  const extendedData: Array<{ tenor: string; days: number; rate: number }> = [];
+  if (interpolationType !== 'step') {
+    for (let i = 0; i < data.length - 1; i++) {
+      extendedData.push(data[i]);
+      // Add intermediate points for smooth interpolation
+      const daysDiff = data[i + 1].days - data[i].days;
+      const rateDiff = data[i + 1].rate - data[i].rate;
+      for (let j = 1; j < 4; j++) {
+        const fraction = j / 4;
+        extendedData.push({
+          tenor: '',
+          days: data[i].days + daysDiff * fraction,
+          rate: data[i].rate + rateDiff * fraction
+        });
+      }
+    }
+    extendedData.push(data[data.length - 1]);
+  }
+
   const chartData = {
-    labels: data.map(d => d.tenor),
+    labels: interpolationType === 'step' ? data.map(d => d.tenor) : extendedData.map(d => d.tenor || ''),
     datasets: [
       {
         label: 'Spot Rate',
-        data: data.map(d => d.rate),
+        data: interpolationType === 'step' ? data.map(d => d.rate) : extendedData.map(d => d.rate),
         borderColor: 'rgb(59, 130, 246)',
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        tension: 0.4,
-        pointRadius: 4,
+        tension: interpolationType === 'step' ? 0 : 0.4,
+        stepped: interpolationType === 'step' ? 'before' as const : false,
+        pointRadius: (context: any) => {
+          // Only show points for actual tenor labels
+          return context.raw && extendedData[context.dataIndex]?.tenor ? 4 : 0;
+        },
         pointHoverRadius: 6,
       },
     ],

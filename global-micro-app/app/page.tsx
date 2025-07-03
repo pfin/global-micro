@@ -4,6 +4,10 @@ import { useState, useEffect } from 'react';
 import CurveSelector from '@/components/CurveSelector';
 import MarketDataTable from '@/components/MarketDataTable';
 import YieldCurveChart from '@/components/YieldCurveChart';
+import InterpolationControl from '@/components/InterpolationControl';
+import SwapInput from '@/components/SwapInput';
+import RiskDisplay from '@/components/RiskDisplay';
+import { YieldCurveBuilder, InterpolationType, SwapDetails, RiskMetrics } from '@/lib/quantlib-curve';
 
 interface Curve {
   id: string;
@@ -26,6 +30,14 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  
+  // New states for enhanced features
+  const [interpolationType, setInterpolationType] = useState<InterpolationType>('LOG_LINEAR');
+  const [showRiskMetrics, setShowRiskMetrics] = useState(false);
+  const [showDV01, setShowDV01] = useState(false);
+  const [showForwardRates, setShowForwardRates] = useState(false);
+  const [swapRisk, setSwapRisk] = useState<RiskMetrics | null>(null);
+  const [curveWithRisk, setCurveWithRisk] = useState<any[]>([]);
 
   // Fetch available curves
   useEffect(() => {
@@ -51,6 +63,10 @@ export default function Home() {
       .then(data => {
         if (data.marketData) {
           setMarketData(data.marketData);
+          // Build curve with risk metrics
+          const builder = new YieldCurveBuilder(data.marketData);
+          builder.setInterpolationType(interpolationType);
+          setCurveWithRisk(builder.getCurveData(true));
         } else if (data.error) {
           setError(data.error);
         }
@@ -60,7 +76,7 @@ export default function Home() {
         setError('Failed to load market data');
       })
       .finally(() => setLoading(false));
-  }, [selectedCurve]);
+  }, [selectedCurve, interpolationType]);
 
   const handleRateChange = async (tenor: string, newRate: number) => {
     // Update local state immediately for responsiveness
@@ -68,6 +84,11 @@ export default function Home() {
       item.tenor === tenor ? { ...item, rate: newRate } : item
     );
     setMarketData(updatedData);
+    
+    // Rebuild curve with new data
+    const builder = new YieldCurveBuilder(updatedData);
+    builder.setInterpolationType(interpolationType);
+    setCurveWithRisk(builder.getCurveData(true));
 
     // Save to backend
     try {
@@ -89,6 +110,21 @@ export default function Home() {
     }
   };
 
+  const handleSwapSubmit = (swap: SwapDetails) => {
+    const builder = new YieldCurveBuilder(marketData);
+    builder.setInterpolationType(interpolationType);
+    const risk = builder.priceSwap(swap);
+    setSwapRisk(risk);
+    setShowRiskMetrics(true);
+    setShowDV01(true);
+  };
+
+  const getChartInterpolationType = (): 'smooth' | 'step' | 'hybrid' => {
+    if (interpolationType === 'STEP_FORWARD') return 'step';
+    if (interpolationType === 'HYBRID') return 'hybrid';
+    return 'smooth';
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
@@ -98,16 +134,28 @@ export default function Home() {
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
               Yield Curve Visualization
             </h1>
-            <button
-              onClick={() => setIsEditing(!isEditing)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                isEditing
-                  ? 'bg-green-600 text-white hover:bg-green-700'
-                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-              }`}
-            >
-              {isEditing ? 'Save Changes' : 'Edit Rates'}
-            </button>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setShowRiskMetrics(!showRiskMetrics)}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  showRiskMetrics
+                    ? 'bg-purple-600 text-white hover:bg-purple-700'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                }`}
+              >
+                {showRiskMetrics ? 'Hide Risk' : 'Show Risk'}
+              </button>
+              <button
+                onClick={() => setIsEditing(!isEditing)}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  isEditing
+                    ? 'bg-green-600 text-white hover:bg-green-700'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                }`}
+              >
+                {isEditing ? 'Save Changes' : 'Edit Rates'}
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -140,36 +188,132 @@ export default function Home() {
 
         {/* Data Display */}
         {!loading && !error && marketData.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Market Data Table */}
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                Market Data
-              </h2>
-              <MarketDataTable
-                data={marketData}
-                onDataChange={handleRateChange}
-                editable={isEditing}
-              />
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+              {/* Market Data Table */}
+              <div className="lg:col-span-2">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                  Market Data
+                </h2>
+                <MarketDataTable
+                  data={marketData}
+                  onDataChange={handleRateChange}
+                  editable={isEditing}
+                />
+              </div>
+
+              {/* Controls */}
+              <div className="space-y-4">
+                <InterpolationControl
+                  currentType={interpolationType}
+                  onChange={setInterpolationType}
+                />
+                
+                {showRiskMetrics && (
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                      Risk Display Options
+                    </h3>
+                    <div className="space-y-2">
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={showDV01}
+                          onChange={(e) => setShowDV01(e.target.checked)}
+                          className="mr-2"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                          Show DV01 by Tenor
+                        </span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={showForwardRates}
+                          onChange={(e) => setShowForwardRates(e.target.checked)}
+                          className="mr-2"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                          Show Forward Rates
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Yield Curve Chart */}
-            <div>
+            <div className="mb-8">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 Curve Visualization
               </h2>
               <YieldCurveChart
                 data={marketData}
                 title={`${selectedCurve.replace('_', ' ')} Yield Curve`}
+                interpolationType={getChartInterpolationType()}
+                showForwardCurve={showForwardRates}
               />
             </div>
-          </div>
+
+            {/* Risk Analysis Section */}
+            {showRiskMetrics && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <SwapInput onSwapSubmit={handleSwapSubmit} />
+                
+                {(showDV01 || showForwardRates) && (
+                  <RiskDisplay
+                    curveData={curveWithRisk}
+                    showDV01={showDV01}
+                    showForwardRates={showForwardRates}
+                  />
+                )}
+              </div>
+            )}
+
+            {/* Swap Risk Results */}
+            {swapRisk && (
+              <div className="mt-8 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                  Swap Valuation Results
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Present Value</p>
+                    <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                      ${swapRisk.pv.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">DV01</p>
+                    <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                      ${swapRisk.dv01.toFixed(0)}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Convexity</p>
+                    <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                      ${swapRisk.convexity.toFixed(0)}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Max DV01 Tenor</p>
+                    <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                      {swapRisk.dv01ByTenor.reduce((max, curr) => 
+                        curr.dv01 > max.dv01 ? curr : max
+                      ).tenor}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Additional Info */}
         <div className="mt-8 text-sm text-gray-600 dark:text-gray-400">
           <p>Last updated: {new Date().toLocaleString()}</p>
-          <p>Data source: Bloomberg Terminal | Interpolation: Log-Linear</p>
+          <p>Data source: Bloomberg Terminal | Interpolation: {interpolationType.replace('_', ' ')}</p>
         </div>
       </main>
     </div>
