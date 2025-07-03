@@ -25,11 +25,17 @@ const mockCurveData = {
   }
 };
 
+type Params = {
+  params: Promise<{
+    curveId: string;
+  }>;
+};
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { curveId: string } }
+  { params }: Params
 ) {
-  const curveId = params.curveId;
+  const { curveId } = await params;
   
   // Check if curve exists
   const curveData = mockCurveData[curveId as keyof typeof mockCurveData];
@@ -46,9 +52,9 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { curveId: string } }
+  { params }: Params
 ) {
-  const curveId = params.curveId;
+  const { curveId } = await params;
   
   try {
     const body = await request.json();
