@@ -1,0 +1,25 @@
+{
+  "name": "quantlib-wasm",
+  "version": "1.0.0",
+  "description": "Custom QuantLib WebAssembly wrapper",
+  "main": "build/quantlib_simple.js",
+  "scripts": {
+    "build": "./build_simple.sh",
+    "test": "node test_node.js"
+  },
+  "keywords": [
+    "quantlib",
+    "webassembly",
+    "finance",
+    "yield-curves"
+  ],
+  "author": "",
+  "license": "MIT",
+  "files": [
+    "build/quantlib_simple.js",
+    "build/quantlib_simple.wasm"
+  ],
+  "dependencies": {
+    "quantlib-wasm": "^1.36.1"
+  }
+}
