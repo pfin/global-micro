@@ -2,9 +2,10 @@ import { createClient } from '@supabase/supabase-js';
 
 // For now, skip Supabase client and use direct database connection
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://rdobtpugtnmefxplgwyp.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkb2J0cHVndG5tZWZ4cGxnd3lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU4NDEzNDAsImV4cCI6MjA1MTQxNzM0MH0.4oWNxtMcJPBEUtoSNvhXXN09M1OWQMO3e2kLGOQJqXA';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Only create client if we have a key
+export const supabase = supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null as any;
 
 export interface Curve {
   id: number;
