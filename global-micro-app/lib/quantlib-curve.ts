@@ -29,16 +29,77 @@ export type InterpolationType = 'LINEAR' | 'LOG_LINEAR' | 'CUBIC_SPLINE' | 'STEP
 export class YieldCurveBuilder {
   private points: CurvePoint[] = [];
   private interpolationType: InterpolationType = 'LOG_LINEAR';
+  private splineCoefficients?: Array<{a: number, b: number, c: number, d: number}>;
   
   constructor(marketData: Array<{tenor: string, rate: number, days: number}>) {
     this.points = marketData.map(d => ({
       ...d,
       discountFactor: this.calculateDiscountFactor(d.rate, d.days),
     }));
+    // Sort points by days
+    this.points.sort((a, b) => a.days - b.days);
   }
   
   setInterpolationType(type: InterpolationType) {
     this.interpolationType = type;
+    if (type === 'CUBIC_SPLINE') {
+      this.buildCubicSpline();
+    }
+  }
+  
+  // Build natural cubic spline coefficients
+  private buildCubicSpline() {
+    const n = this.points.length;
+    if (n < 2) return;
+    
+    const h: number[] = [];
+    const alpha: number[] = [];
+    
+    // Step 1: Calculate h and alpha
+    for (let i = 0; i < n - 1; i++) {
+      h[i] = this.points[i + 1].days - this.points[i].days;
+    }
+    
+    for (let i = 1; i < n - 1; i++) {
+      alpha[i] = (3 / h[i]) * (this.points[i + 1].rate - this.points[i].rate) -
+                 (3 / h[i - 1]) * (this.points[i].rate - this.points[i - 1].rate);
+    }
+    
+    // Step 2: Solve tridiagonal system
+    const l: number[] = new Array(n).fill(0);
+    const mu: number[] = new Array(n).fill(0);
+    const z: number[] = new Array(n).fill(0);
+    const c: number[] = new Array(n).fill(0);
+    
+    l[0] = 1;
+    mu[0] = 0;
+    z[0] = 0;
+    
+    for (let i = 1; i < n - 1; i++) {
+      l[i] = 2 * (this.points[i + 1].days - this.points[i - 1].days) - h[i - 1] * mu[i - 1];
+      mu[i] = h[i] / l[i];
+      z[i] = (alpha[i] - h[i - 1] * z[i - 1]) / l[i];
+    }
+    
+    l[n - 1] = 1;
+    z[n - 1] = 0;
+    c[n - 1] = 0;
+    
+    // Back substitution
+    for (let j = n - 2; j >= 0; j--) {
+      c[j] = z[j] - mu[j] * c[j + 1];
+    }
+    
+    // Step 3: Calculate spline coefficients
+    this.splineCoefficients = [];
+    for (let i = 0; i < n - 1; i++) {
+      const a = this.points[i].rate;
+      const b = (this.points[i + 1].rate - this.points[i].rate) / h[i] - 
+                h[i] * (c[i + 1] + 2 * c[i]) / 3;
+      const d = (c[i + 1] - c[i]) / (3 * h[i]);
+      
+      this.splineCoefficients.push({ a, b, c: c[i], d });
+    }
   }
   
   private calculateDiscountFactor(rate: number, days: number): number {
@@ -73,6 +134,9 @@ export class YieldCurveBuilder {
       case 'LOG_LINEAR':
         return this.logLinearInterpolate(p1, p2, days);
       
+      case 'CUBIC_SPLINE':
+        return this.cubicSplineInterpolate(i, days);
+      
       case 'STEP_FORWARD':
         return p1.rate; // Use the rate from the earlier tenor
       
@@ -101,6 +165,23 @@ export class YieldCurveBuilder {
     const df = df1 * Math.pow(df2 / df1, t);
     const years = days / 365.0;
     return -Math.log(df) / years * 100.0;
+  }
+  
+  private cubicSplineInterpolate(segmentIndex: number, days: number): number {
+    if (!this.splineCoefficients || segmentIndex >= this.splineCoefficients.length) {
+      // Fallback to linear if spline not available
+      return this.linearInterpolate(
+        this.points[segmentIndex], 
+        this.points[segmentIndex + 1], 
+        days
+      );
+    }
+    
+    const coeff = this.splineCoefficients[segmentIndex];
+    const x = days - this.points[segmentIndex].days;
+    
+    // Cubic polynomial: a + b*x + c*x^2 + d*x^3
+    return coeff.a + coeff.b * x + coeff.c * x * x + coeff.d * x * x * x;
   }
   
   // Calculate DV01 for each curve point

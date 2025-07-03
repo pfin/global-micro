@@ -5,22 +5,27 @@ import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
+  LogarithmicScale,
   PointElement,
   LineElement,
   Title,
   Tooltip,
   Legend,
+  TimeScale,
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
+import 'chartjs-adapter-date-fns';
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
+  LogarithmicScale,
   PointElement,
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  TimeScale
 );
 
 interface YieldCurveChartProps {
@@ -32,6 +37,8 @@ interface YieldCurveChartProps {
   title?: string;
   interpolationType?: 'smooth' | 'step' | 'hybrid';
   showForwardCurve?: boolean;
+  timeScale?: 'normal' | 'log';
+  baseDate?: Date;
 }
 
 export default function YieldCurveChart({ 

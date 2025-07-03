@@ -9,6 +9,17 @@ Before responding to any prompt, ALWAYS run:
 
 This helps track time order and recent changes in the project.
 
+## CRITICAL: NEVER IMPLEMENT YOUR OWN MATH
+**DO NOT IMPLEMENT ANY OF YOUR OWN MATH. NEVER YOUR OWN MATH. NEVER EVER.**
+- **USE LIBRARIES ALWAYS** - You will NEVER be better than using a library
+- Like trying to write your own pandas or polars functions - NEVER DO THAT
+- ALL yield curve calculations MUST use QuantLib functions
+- ALL forward rate calculations MUST use QuantLib functions  
+- ALL interpolation MUST use QuantLib functions
+- NO manual spline implementations
+- NO manual forward rate formulas
+- ONLY use QuantLib-WASM for ALL financial calculations
+
 ## IMPORTANT: Development Workflow
 When developing Next.js applications:
 1. **ALWAYS use Puppeteer** to browse and test local development server

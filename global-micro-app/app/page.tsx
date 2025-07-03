@@ -4,11 +4,13 @@ import { useState, useEffect } from 'react';
 import CurveSelector from '@/components/CurveSelector';
 import MarketDataTable from '@/components/MarketDataTable';
 import YieldCurveChart from '@/components/YieldCurveChart';
+import CurveVisualization from '@/components/CurveVisualization';
 import InterpolationControl from '@/components/InterpolationControl';
 import SwapInput from '@/components/SwapInput';
 import RiskDisplay from '@/components/RiskDisplay';
 import DailyForwardChart from '@/components/DailyForwardChart';
 import DateRangeInput from '@/components/DateRangeInput';
+import TimeScaleToggle from '@/components/TimeScaleToggle';
 import { YieldCurveBuilder, InterpolationType, SwapDetails, RiskMetrics } from '@/lib/quantlib-curve';
 
 interface Curve {
@@ -45,6 +47,7 @@ export default function Home() {
     start: new Date(),
     end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
   });
+  const [timeScaleType, setTimeScaleType] = useState<'normal' | 'log'>('normal');
 
   // Fetch available curves
   useEffect(() => {
@@ -142,16 +145,6 @@ export default function Home() {
               Yield Curve Visualization
             </h1>
             <div className="flex space-x-2">
-              <button
-                onClick={() => setShowDailyForwards(!showDailyForwards)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  showDailyForwards
-                    ? 'bg-red-600 text-white hover:bg-red-700'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                }`}
-              >
-                {showDailyForwards ? 'Hide Daily Forwards' : 'Show Daily Forwards'}
-              </button>
               <button
                 onClick={() => setShowRiskMetrics(!showRiskMetrics)}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
@@ -268,33 +261,25 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Yield Curve Chart */}
+            {/* Main Curve Visualization */}
             <div className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                Curve Visualization
-              </h2>
-              <YieldCurveChart
-                data={marketData}
-                title={`${selectedCurve.replace('_', ' ')} Yield Curve`}
-                interpolationType={getChartInterpolationType()}
-                showForwardCurve={showForwardRates}
-              />
-            </div>
-
-            {/* Daily Forward Rates Chart */}
-            {showDailyForwards && (
-              <div className="mb-8">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                  Daily Forward Rate Analysis
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Curve Analysis
                 </h2>
-                <DailyForwardChart
-                  marketData={marketData}
-                  interpolationType={interpolationType}
-                  startDate={dateRange.start}
-                  endDate={dateRange.end}
+                <TimeScaleToggle
+                  currentScale={timeScaleType}
+                  onChange={setTimeScaleType}
                 />
               </div>
-            )}
+              <CurveVisualization
+                marketData={marketData}
+                interpolationType={interpolationType}
+                baseDate={dateRange.start}
+                endDate={dateRange.end}
+                timeScaleType={timeScaleType}
+              />
+            </div>
 
             {/* Risk Analysis Section */}
             {showRiskMetrics && (
